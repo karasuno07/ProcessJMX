@@ -6,8 +6,10 @@ import org.apache.jmeter.engine.StandardJMeterEngine;
 import org.apache.jmeter.protocol.http.sampler.HTTPSamplerProxy;
 import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.testelement.TestElement;
+import org.apache.jmeter.testelement.property.BooleanProperty;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.collections.HashTree;
+import org.apache.jorphan.collections.ListedHashTree;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -18,7 +20,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
-
 
     public static void main(String... args) throws ParserConfigurationException, IOException, SAXException {
         StandardJMeterEngine jmeter = new StandardJMeterEngine();
@@ -46,52 +47,57 @@ public class Main {
 
     public static void doAction(File file) throws IOException {
         HashTree testPlanTree = SaveService.loadTree(file);
+
         AtomicInteger count = new AtomicInteger(0);
+
         testPlanTree.values().forEach(threadGroup -> {
+
             threadGroup.values().forEach(controller -> {
 
-                TransactionController txCtrl = new TransactionController();
-                txCtrl.setName(String.valueOf(count.incrementAndGet()));
-
                 for (Map.Entry<Object, HashTree> entry : controller.entrySet()) {
-//                    System.out.println(entry.getKey());
                     HashTree sample = entry.getValue();
-//                    System.out.println(objectHashTreeEntry.getValue());
+                    TransactionController subController = new TransactionController();
+
+                    HashTree subTree = new ListedHashTree();
+
                     for (Object o : sample.getArray()) {
-
-
                         if (!(o instanceof HTTPSamplerProxy)) {
                             continue;
                         }
                         HTTPSamplerProxy proxy = (HTTPSamplerProxy) o;
 
                         boolean isFile = FilenameUtils.getExtension(proxy.getPath()).length() > 0;
-                        if (isFile || proxy.getDomain().contains("firefox.com")
-                                || proxy.getDomain().contains("uat1-socket.alpaca.vn")
-                                || proxy.getMethod().equalsIgnoreCase("options")) {
-                            sample.remove(o);
-                        } else {
-                            txCtrl.addTestElement(proxy);
+                        boolean isDomainUrl = proxy.getPath().endsWith(".org") ||
+                                proxy.getPath().endsWith(".com");
+                        boolean isNotAlpacaDomain = !proxy.getDomain().contains(".alpaca.vn");
+                        boolean isNotSocketDomain = !proxy.getDomain().contains("uat1-socket.alpaca.vn");
+                        boolean isNotOptionsMethod = !proxy.getMethod().equalsIgnoreCase("options");
+                        if (!isFile && !isDomainUrl && !isNotAlpacaDomain
+                                && isNotSocketDomain && isNotOptionsMethod) {
+
+                            if (!proxy.getDomain().contains("uat1-sso.alpaca.vn")
+                                    && !proxy.getDomain().contains("uat1-api.alpaca.vn")
+                                    && subTree.size() > 0) {
+                                subController.setName("Sub Controller " + count.incrementAndGet());
+                                subController.setEnabled(true);
+                                subController.setProperty(TestElement.TEST_CLASS,
+                                                          subController.getClass().getName());
+                                subController.setProperty(TestElement.GUI_CLASS, "TransactionControllerGui");
+                                subController.setProperty(
+                                        new BooleanProperty("TransactionController.includeTimers", false));
+                                sample.add(subController, subTree);
+                                subController = new TransactionController();
+                                subTree = new ListedHashTree();
+                            }
+
+                            HashTree tree = sample.get(o);
+                            subTree.set(o, tree);
                         }
-
-
-                        if (!(proxy.getDomain().contains("uat1-sso.alpaca.vn")
-                                || proxy.getDomain().contains("uat1-api-alpaca.vn"))) {
-
-
-//                            nodes.forEach(node -> {
-//                                TestElement testElement = (TestElement) node;
-//                                transactionController.addTestElement(testElement);
-//                            });
-//                            System.out.println(transactionController.next());
-//                            System.out.println(transactionController.getSearchableTokens());
-                            System.out.println(txCtrl);
-                            txCtrl = new TransactionController();
-                        }
-
+                        sample.remove(o);
                     }
-                }
 
+                }
+                count.set(0);
             });
         });
 
