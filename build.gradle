@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+}
+
+group 'vn.alpaca'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+def withoutBom = {
+    exclude group: 'org.apache.jmeter', module: 'bom'
+} as Object
+
+dependencies {
+    implementation group: 'org.apache.jmeter', name: 'ApacheJMeter_core', version: '5.4.1', withoutBom
+    implementation group: 'org.apache.jmeter', name: 'ApacheJMeter_http', version: '5.4.1', withoutBom
+    implementation group: 'org.apache.jmeter', name: 'ApacheJMeter_components', version: '5.4.1', withoutBom
+    implementation group: 'org.apache.jmeter', name: 'ApacheJMeter_java', version: '5.4.1', withoutBom
+    implementation group: 'org.apache.jmeter', name: 'ApacheJMeter_config', version: '5.4.1', withoutBom
+    implementation group: 'org.apache.jmeter', name: 'jorphan', version: '5.4.1', withoutBom
+
+    implementation group: 'commons-io', name: 'commons-io', version: '2.11.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+}
+
+test {
+    useJUnitPlatform()
+}
